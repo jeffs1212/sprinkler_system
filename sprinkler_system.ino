@@ -4,14 +4,14 @@
 /*
 Sprinkler control for a 6 valve system
 */
-
+//
 #include <Wire.h>
 #include <SoftwareSerial.h>
-
-SoftwareSerial lcd(3, 2);  // This is required, to start an instance of an LCD.  pin 2 = TX, pin 3 = RX (unused)
-
+//
+SoftwareSerial lcd(11, 10);  // This is required, to start an instance of an LCD.  pin 10 = TX, pin 11 = RX (unused)
+//
 RTC_PCF8523 rtc;
-
+//
 char timeBuf[16];  // buffer for printing time formatted
 char daysOfTheWeek[7][10] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 char valveSelected[8][6] = {"ZONE1", "ZONE2", "ZONE3", "ZONE4", "ZONE5", "ZONE6", "ALL", "NONE"};
@@ -23,7 +23,7 @@ char displayZone5[2][2] = {"-", "5"};
 char displayZone6[2][2] = {"-", "6"};
 int zoneArray[8] = {1,1,1,1,1,1,1,0};  // default value for zone select enables, 8-way switch = zones 1-6,ALL,nothing
 int valveArray[6] = {0,0,0,0,0,0}; // default valve relay for each zone is off
-
+//
 // run time durations
 int v1duration = 700;
 int v2duration = 500;
@@ -34,14 +34,17 @@ int v6duration = 1200;
 int testDuration = 200;
 uint16_t runTime = 0;
 int i;
-
+//
 // hardware assignments
 // switch assignments
-const byte enablebutton = A1;//Pin pushbutton is connected to
-const byte testbutton = A2;//Pin pushbutton is connected to
+const byte enablebutton = 2;//Pin pushbutton is connected to
+const byte testbutton = 3;//Pin pushbutton is connected to
+//momentary push buttons assigned to pins 2 and 3 as Arduino interrupt pins
 int adc_select_pin = A0; // zone select 8-way switch input pin
+//initialize the zone select values
 int zoneSelect = 0;
 int adc_select = 0;
+boolean enable=false,test=false;
 byte SelectSwitch;
 // valve select relay switch assignments
 const byte valve1relay = 4;  //digital output 4 controls relay 1
@@ -50,7 +53,7 @@ const byte valve3relay = 6;  //digital output 6 controls relay 3
 const byte valve4relay = 7;  //digital output 7 controls relay 4
 const byte valve5relay = 8;  //digital output 8 controls relay 5
 const byte valve6relay = 9;  //digital output 9 controls relay 6
-
+//
 #define ZONE1    0
 #define ZONE2    1
 #define ZONE3    2
@@ -59,24 +62,24 @@ const byte valve6relay = 9;  //digital output 9 controls relay 6
 #define ZONE6    5
 #define ZONE_ALL 6
 #define ALL_OFF  7
-
+//
 // read the select switch
 int read_select_switch()
 {
  adc_select = analogRead(adc_select_pin);      // read the value from the select switch
  if (adc_select > 1000) return ALL_OFF;
- if (adc_select < 80)   return ZONE1; 
+ if (adc_select < 90)   return ZONE1; 
  if (adc_select < 150)  return ZONE2;  
  if (adc_select < 300)  return ZONE3; 
  if (adc_select < 450)  return ZONE4; 
  if (adc_select < 600)  return ZONE5; 
  if (adc_select < 750)  return ZONE6;
  if (adc_select < 850)  return ZONE_ALL;
- 
+// 
  return ALL_OFF;   // if all select values fail, return this...
 }
-
-
+//
+//
 void setup() {
   // initialize the RTC and serial monitor
   Serial.begin(9600);//Prepare serial port for use
@@ -94,7 +97,7 @@ void setup() {
   lcd.print("Running clock...");
   delay(2000);
   clearDisplay();  // Clear the display
-    
+  //  
   pinMode(enablebutton,INPUT);
   pinMode(testbutton,INPUT);
   pinMode(adc_select_pin, INPUT);
@@ -105,16 +108,15 @@ void setup() {
   pinMode(valve5relay, OUTPUT);
   pinMode(valve6relay, OUTPUT);
 }
-
+//
 void loop() {
-  boolean enable=false,test=false;
-  
+//  
   zoneSelect = read_select_switch();  // read the select switch
   Serial.print(adc_select);   // for tuning the button voltage divider
   Serial.println("mv");
-  
+  //
   DateTime now = rtc.now();
-    
+  //  
     Serial.print(now.year(), DEC);
     Serial.print('/');
     Serial.print(now.month(), DEC);
@@ -129,16 +131,16 @@ void loop() {
     Serial.print(':');
     Serial.print(now.second(), DEC);
     Serial.println();
-  
+  //  
     delay(3);  
-
+//
 /*
 Tracks presses of enable and test buttons,
 */
-
-  if (boSwitchClosed(enablebutton)) {enable=true;};  // check if the enable button has been pushed
-  if (boSwitchClosed(testbutton)) {test=true;};   // check if the test button has been pushed
-  
+//
+attachInterrupt(digitalPinToInterrupt(enablebutton), EnablePushButton, FALLING);  //check in enable button has been pushed
+attachInterrupt(digitalPinToInterrupt(testbutton), TestPushButton, FALLING);  //check in test button has been pushed
+//  
   if (enable) 
     {
      Serial.print(valveSelected[zoneSelect]);  //print the zone selected by the enable button
@@ -160,6 +162,7 @@ Tracks presses of enable and test buttons,
          valveArray[i] = 0;  };
      }
      zoneArray[zoneSelect] = !zoneArray[zoneSelect];  // if select equals an individual zone, (0-5), toggle the selected zone enable
+     enable = false;
     }
   if (test) 
     {
@@ -184,11 +187,12 @@ Tracks presses of enable and test buttons,
        runTime = 0; // reset runtime to 0
        delay(5);     //  might needto make this longer
      }
+     test = false;
     }
   delay(200);//So serial port isn't overwhelmed by too-rapidly
              //repeated instances of sending the answer again
              //and again.
-
+  //
   // default display output and turn all the valves off
   if (runTime == 0) {
     setLCDCursor(3);  // Set cursor to the 4th spot, 1st line
@@ -216,7 +220,7 @@ Tracks presses of enable and test buttons,
     for (i=0; i<6; i++) {
       valveArray[i] = 0;};   // if runtime = 0, turn off the valves
   }
-  
+  //
   // valve control
   digitalWrite(valve1relay, valveArray[0]);
   digitalWrite(valve2relay, valveArray[1]);
@@ -224,7 +228,7 @@ Tracks presses of enable and test buttons,
   digitalWrite(valve4relay, valveArray[3]);
   digitalWrite(valve5relay, valveArray[4]);
   digitalWrite(valve6relay, valveArray[5]);
-  
+  //
   // for sprinkler zone running
   if (runTime > 0) {  
     runTime = runTime-1;
@@ -234,36 +238,43 @@ Tracks presses of enable and test buttons,
     Serial.println(runTime);
     if (runTime == 0) clearDisplay();  // Clear the display at the end of th run time 
   } 
-  
+  //
 }
-
+//
 // functions that need to be defined
-
-boolean boSwitchClosed(byte bWhichSwitch)
+//
+void EnablePushButton()  // interrupt service routine for enable push button debounce
+{
+  static unsigned long enable_last_interrupt_time = 0;  //static only initializes the 1st time the function is called
+  unsigned long enable_interrupt_time = millis();
+  if (enable_interrupt_time - enable_last_interrupt_time > 200)
   {
-    boolean boTmp=false;
-    if (digitalRead(bWhichSwitch)==LOW) {boTmp=true;};
-    delay(4);//wait a moment, to let bounces pass...
-    //if the switch was closed, look at it again and again
-    //  until it is open again. This "while" loop doesn't DO
-    //  anything... except go 'round and 'round 'til the
-    //  switch is released.
-    while (boTmp && (digitalRead(bWhichSwitch)==LOW)) {;};
-    delay(4);//Again let bounces pass...
-    //Again wait for the switch to be open.
-    while (boTmp && (digitalRead(bWhichSwitch)==LOW)) {;};
-    return boTmp;
+    enable = true;
   }
-
+  enable_last_interrupt_time = enable_interrupt_time;
+}
+//
+void TestPushButton()  // interrupt service routine for test push button debounce
+{
+  static unsigned long test_last_interrupt_time = 0;  //static only initializes the 1st time the function is called
+  unsigned long test_interrupt_time = millis();
+  if (test_interrupt_time - test_last_interrupt_time > 200)
+  {
+    test = true;
+  }
+  test_last_interrupt_time = test_interrupt_time;
+}
+//
 void clearDisplay()
 {
   lcd.write(0xFE);  // send the special command
   lcd.write(0x01);  // send the clear screen command
 }
-
+//
 void setLCDCursor(byte cursor_position)
 {
   lcd.write(0xFE);  // send the special command
   lcd.write(0x80);  // send the set cursor command
   lcd.write(cursor_position);  // send the cursor position
 }
+//
