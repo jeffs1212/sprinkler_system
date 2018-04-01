@@ -39,12 +39,12 @@ int i;
 // switch assignments
 const byte enablebutton = 2;//Pin pushbutton is connected to
 const byte testbutton = 3;//Pin pushbutton is connected to
-bool buttonPushed = false;
 //momentary push buttons assigned to pins 2 and 3 as Arduino interrupt pins
 int adc_select_pin = A0; // zone select 8-way switch input pin
 //initialize the zone select values
 int zoneSelect = 0;
 int adc_select = 0;
+boolean enable=false,test=false;
 byte SelectSwitch;
 // valve select relay switch assignments
 const byte valve1relay = 4;  //digital output 4 controls relay 1
@@ -68,7 +68,7 @@ int read_select_switch()
 {
  adc_select = analogRead(adc_select_pin);      // read the value from the select switch
  if (adc_select > 1000) return ALL_OFF;
- if (adc_select < 80)   return ZONE1; 
+ if (adc_select < 90)   return ZONE1; 
  if (adc_select < 150)  return ZONE2;  
  if (adc_select < 300)  return ZONE3; 
  if (adc_select < 450)  return ZONE4; 
@@ -110,8 +110,7 @@ void setup() {
 }
 //
 void loop() {
-  boolean enable=false,test=false;
-  
+//  
   zoneSelect = read_select_switch();  // read the select switch
   Serial.print(adc_select);   // for tuning the button voltage divider
   Serial.println("mv");
@@ -139,10 +138,8 @@ void loop() {
 Tracks presses of enable and test buttons,
 */
 //
-attachInterrupt(digitalPinToInterrupt(enablebutton), PushButton, RISING);  //check in enable button has been pushed
-attachInterrupt(digitalPinToInterrupt(testbutton), PushButton, RISING);  //check in test button has been pushed
-//  if (boSwitchClosed(enablebutton)) {enable=true;};  // check if the enable button has been pushed
-//  if (boSwitchClosed(testbutton)) {test=true;};   // check if the test button has been pushed
+attachInterrupt(digitalPinToInterrupt(enablebutton), EnablePushButton, FALLING);  //check in enable button has been pushed
+attachInterrupt(digitalPinToInterrupt(testbutton), TestPushButton, FALLING);  //check in test button has been pushed
 //  
   if (enable) 
     {
@@ -165,6 +162,7 @@ attachInterrupt(digitalPinToInterrupt(testbutton), PushButton, RISING);  //check
          valveArray[i] = 0;  };
      }
      zoneArray[zoneSelect] = !zoneArray[zoneSelect];  // if select equals an individual zone, (0-5), toggle the selected zone enable
+     enable = false;
     }
   if (test) 
     {
@@ -189,6 +187,7 @@ attachInterrupt(digitalPinToInterrupt(testbutton), PushButton, RISING);  //check
        runTime = 0; // reset runtime to 0
        delay(5);     //  might needto make this longer
      }
+     test = false;
     }
   delay(200);//So serial port isn't overwhelmed by too-rapidly
              //repeated instances of sending the answer again
@@ -244,32 +243,26 @@ attachInterrupt(digitalPinToInterrupt(testbutton), PushButton, RISING);  //check
 //
 // functions that need to be defined
 //
-/* boolean boSwitchClosed(byte bWhichSwitch)
-  {
-    boolean boTmp=false;
-    if (digitalRead(bWhichSwitch)==LOW) {boTmp=true;};
-    delay(4);//wait a moment, to let bounces pass...
-    //if the switch was closed, look at it again and again
-    //  until it is open again. This "while" loop doesn't DO
-    //  anything... except go 'round and 'round 'til the
-    //  switch is released.
-    while (boTmp && (digitalRead(bWhichSwitch)==LOW)) {;};
-    delay(4);//Again let bounces pass...
-    //Again wait for the switch to be open.
-    while (boTmp && (digitalRead(bWhichSwitch)==LOW)) {;};
-    return boTmp;
-  }
-*/
-//
-void PushButton()  // interrupt service routine for push button debounce
+void EnablePushButton()  // interrupt service routine for enable push button debounce
 {
-  static unsigned long last_interrupt_time = 0;  //static only initializes the 1st time the function is called
-  unsigned long interrupt_time = millis();
-  if (interrupt_time - last_interrupt_time > 200)
+  static unsigned long enable_last_interrupt_time = 0;  //static only initializes the 1st time the function is called
+  unsigned long enable_interrupt_time = millis();
+  if (enable_interrupt_time - enable_last_interrupt_time > 200)
   {
-    buttonPushed = true;
+    enable = true;
   }
-  last_interrupt_time = interrupt_time;
+  enable_last_interrupt_time = enable_interrupt_time;
+}
+//
+void TestPushButton()  // interrupt service routine for test push button debounce
+{
+  static unsigned long test_last_interrupt_time = 0;  //static only initializes the 1st time the function is called
+  unsigned long test_interrupt_time = millis();
+  if (test_interrupt_time - test_last_interrupt_time > 200)
+  {
+    test = true;
+  }
+  test_last_interrupt_time = test_interrupt_time;
 }
 //
 void clearDisplay()
