@@ -1,5 +1,6 @@
 /*
 Sprinkler control for a 6 valve system
+merged 12/20/18
 */
 //
 #include <RTClib.h>   // RTClib - Version: Latest
