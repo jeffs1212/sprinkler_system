@@ -1,6 +1,7 @@
 /*
 Sprinkler control for a 6 valve system
-merged 12/20/18
+branch sprinkler_system-v2 merged 12/20/18
+branch sprinkler_system-v3 started 12/20/18
 */
 //
 #include <RTClib.h>   // RTClib - Version: Latest
