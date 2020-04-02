@@ -1,11 +1,27 @@
+
+#include <Adafruit_EPD.h>
+#include <Adafruit_IL0373.h>
+#include <Adafruit_IL0398.h>
+#include <Adafruit_IL91874.h>
+#include <Adafruit_MCPSRAM.h>
+#include <Adafruit_SSD1608.h>
+#include <Adafruit_SSD1675.h>
+#include <Adafruit_SSD1675B.h>
+
+
+// SparkFun_ESP8266_AT_Arduino_Library - Version: Latest 
+//#include <SparkFunESP8266Client.h>
+//#include <SparkFunESP8266Server.h>
+//#include <SparkFunESP8266WiFi.h>
+
+// RTClib - Version: Latest 
+#include <RTClib.h>   // try both include versions to see if it finds the libray when compiling.  I had to download the library locally
+//#include "RTClib.h"  // after downloaading locally, i didn't need this library
 /*
 Sprinkler control for a 6 valve system
-branch sprinkler_system-v2 merged 12/20/18
-branch sprinkler_system-v3 started 12/20/18
 */
 //
-#include <RTClib.h>   // RTClib - Version: Latest
-#include <Wire.h>    // LCD communication
+#include <Wire.h>
 #include <SoftwareSerial.h>
 //
 SoftwareSerial lcd(11, 10);  // This is required, to start an instance of an LCD.  pin 10 = TX, pin 11 = RX (unused)
@@ -15,43 +31,38 @@ RTC_PCF8523 rtc;
 char timeBuf[16];  // buffer for printing time formatted
 char daysOfTheWeek[7][10] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 char valveSelected[8][6] = {"ZONE1", "ZONE2", "ZONE3", "ZONE4", "ZONE5", "ZONE6", "ALL", "NONE"};
-char displayZone1[2][2] = {"-", "1"};  //display on the LCD "-" if the zone is OFF, or the zone number if the zone is ON
+char displayZone1[2][2] = {"-", "1"};
 char displayZone2[2][2] = {"-", "2"};
 char displayZone3[2][2] = {"-", "3"};
 char displayZone4[2][2] = {"-", "4"};
 char displayZone5[2][2] = {"-", "5"};
 char displayZone6[2][2] = {"-", "6"};
-int zoneArray[8] = {1,1,1,1,1,1,1,0};  // default values for zone select enables, 8-way switch = zones 1-6,ALL,nothing
+int zoneArray[8] = {1,1,1,1,1,1,1,0};  // default value for zone select enables, 8-way switch = zones 1-6,ALL,nothing
 int valveArray[6] = {0,0,0,0,0,0}; // default valve relay for each zone is off
 //
 // run time durations
-int v1duration = 700;  // check these values - ideally want this to represent "minutes"
+int v1duration = 700;
 int v2duration = 500;
 int v3duration = 500;
 int v4duration = 500;
 int v5duration = 500;
 int v6duration = 1200;
 int testDuration = 200;
-uint16_t runTime = 0;  // initialize a variable for the run time count
+uint16_t runTime = 0;
 int i;
-//
-/*
-  STILL NEED TO DEFINE A VARIABLE FOR THE DAYS TO WATER
-  STILL NEED TO DEFINE A VIARIABLE FOR THE TIME OF DAY TO START
-*/
 //
 // hardware assignments
 // switch assignments
+const byte enablebutton = 2;//Pin pushbutton is connected to
+const byte testbutton = 3;//Pin pushbutton is connected to
 //momentary push buttons assigned to pins 2 and 3 as Arduino interrupt pins
-const byte enablebutton = 2;//the "enable" button toggles "on/off" the zone selected by the rotary switch
-const byte testbutton = 3;//the "test" button runs the zone selected by the rotary switch.  It does not run when in the "ALL" position
-int adc_select_pin = A0; // zone select 8-way rotary switch analog input pin for the voltage divider input
+int adc_select_pin = A0; // zone select 8-way switch input pin
 //initialize the zone select values
 int zoneSelect = 0;
 int adc_select = 0;
 boolean enable=false,test=false;
 byte SelectSwitch;
-// valve relay switch assignments
+// valve select relay switch assignments
 const byte valve1relay = 4;  //digital output 4 controls relay 1
 const byte valve2relay = 5;  //digital output 5 controls relay 2
 const byte valve3relay = 6;  //digital output 6 controls relay 3
@@ -68,21 +79,21 @@ const byte valve6relay = 9;  //digital output 9 controls relay 6
 #define ZONE_ALL 6
 #define ALL_OFF  7
 //
-// this is the routine to read the zone select rotary switch voltage divider
+// read the select switch
 int read_select_switch()
- {
-  adc_select = analogRead(adc_select_pin);      // read the value from the select switch
-  if (adc_select > 1000) return ALL_OFF;
-  if (adc_select < 90)   return ZONE1; 
-  if (adc_select < 150)  return ZONE2;  
-  if (adc_select < 300)  return ZONE3; 
-  if (adc_select < 450)  return ZONE4; 
-  if (adc_select < 600)  return ZONE5; 
-  if (adc_select < 750)  return ZONE6;
-  if (adc_select < 850)  return ZONE_ALL;
-  // 
-  return ALL_OFF;   // if all select values fail, return this...
- }
+{
+ adc_select = analogRead(adc_select_pin);      // read the value from the select switch
+ if (adc_select > 1000) return ALL_OFF;
+ if (adc_select < 90)   return ZONE1; 
+ if (adc_select < 150)  return ZONE2;  
+ if (adc_select < 300)  return ZONE3; 
+ if (adc_select < 450)  return ZONE4; 
+ if (adc_select < 600)  return ZONE5; 
+ if (adc_select < 750)  return ZONE6;
+ if (adc_select < 850)  return ZONE_ALL;
+// 
+ return ALL_OFF;   // if all select values fail, return this...
+}
 //
 //
 void setup() {
@@ -103,7 +114,6 @@ void setup() {
   delay(2000);
   clearDisplay();  // Clear the display
   //  
-  // initialize the Ardiono pin modes
   pinMode(enablebutton,INPUT);
   pinMode(testbutton,INPUT);
   pinMode(adc_select_pin, INPUT);
@@ -117,11 +127,11 @@ void setup() {
 //
 void loop() {
 //  
-  zoneSelect = read_select_switch();  // read the select switch and return the name of the "zone"
-  Serial.print(adc_select);   // display the voltage in the serial monitor for tuning the button voltage divider values
-  Serial.println("mv");       // the voltage values are in millivolts
+  zoneSelect = read_select_switch();  // read the select switch
+  Serial.print(adc_select);   // for tuning the button voltage divider
+  Serial.println("mv");
   //
-  DateTime now = rtc.now();  // get the current date form the RTC
+  DateTime now = rtc.now();
   //  
     Serial.print(now.year(), DEC);
     Serial.print('/');
@@ -139,17 +149,17 @@ void loop() {
     Serial.println();
   //  
     delay(3);  
- //
- /*
- Tracks presses of enable and test buttons,
- */
- //
- attachInterrupt(digitalPinToInterrupt(enablebutton), EnablePushButton, FALLING);  //check in enable button has been pushed
- attachInterrupt(digitalPinToInterrupt(testbutton), TestPushButton, FALLING);  //check in test button has been pushed
- //  
- if (enable) 
+//
+/*
+Tracks presses of enable and test buttons,
+*/
+//
+attachInterrupt(digitalPinToInterrupt(enablebutton), EnablePushButton, FALLING);  //check in enable button has been pushed
+attachInterrupt(digitalPinToInterrupt(testbutton), TestPushButton, FALLING);  //check in test button has been pushed
+//  
+  if (enable) 
     {
-     Serial.print(valveSelected[zoneSelect]);  //print from the array of "valveSelected" names the zone selected when the enable button was pressed 
+     Serial.print(valveSelected[zoneSelect]);  //print the zone selected by the enable button
      Serial.println(" selected");
      clearDisplay();  // Clear the display
      setLCDCursor(0);  // Set cursor to the 1st spot, 1st line 
@@ -157,11 +167,11 @@ void loop() {
      lcd.print(" selected");
      delay(1000);     //  delay to have a chance to read the zone enabled or disabled
      clearDisplay();  // Clear the display
-     if (zoneSelect == 6) {   //  if select = ALL turn all the "zone enables" ON 
+     if (zoneSelect == 6) {   //  if select = ALL turn enable all zones to be run
        for (i=0; i < 6; i++) {
          zoneArray[i] = 1;   };
      } 
-     if (zoneSelect == 7) {   //  if select = ALL OFF disable all zones and turn off all valves
+     if (zoneSelect == 7) {   //  if select = ALL OFF disable all zones andturn off all valves
        for (i=0; i < 6; i++) {
          zoneArray[i] = 0;   };
        for (i=0; i < 6; i++) {
@@ -170,17 +180,16 @@ void loop() {
      zoneArray[zoneSelect] = !zoneArray[zoneSelect];  // if select equals an individual zone, (0-5), toggle the selected zone enable
      enable = false;
     }
- //
- if (test) 
+  if (test) 
     {
      if (runTime == 0) {
        Serial.print("Test:");   // print the zone to start testing
-       Serial.print(valveSelected[zoneSelect]);  //print from the array of "valveSelected" names the zone selected when the test button was pressed 
+       Serial.print(valveSelected[zoneSelect]);
        Serial.println(" on");
        clearDisplay();  // Clear the display
        setLCDCursor(0);  // Set cursor to the 1st spot, 1st line 
        lcd.print("Test:");     // display the zone to start testing
-       lcd.print(valveSelected[zoneSelect]);  // display the zone selected by the test button
+       lcd.print(valveSelected[zoneSelect]);
        lcd.print(" on"); 
        valveArray[zoneSelect] = 1;  // turn on the selected valve
        runTime = testDuration;     // set the run time to the test duration
@@ -196,12 +205,12 @@ void loop() {
      }
      test = false;
     }
- // 
- delay(200);//So serial port isn't overwhelmed by too-rapidly
-             //repeated instances of sending the answer again and again
- //
- // if no button presses this is the default display output and turn all the valves off
- if (runTime == 0) {
+  delay(200);//So serial port isn't overwhelmed by too-rapidly
+             //repeated instances of sending the answer again
+             //and again.
+  //
+  // default display output and turn all the valves off
+  if (runTime == 0) {
     setLCDCursor(3);  // Set cursor to the 4th spot, 1st line
     if (now.hour()<=9)
      {lcd.print("0");}
@@ -226,13 +235,9 @@ void loop() {
     lcd.println();
     for (i=0; i<6; i++) {
       valveArray[i] = 0;};   // if runtime = 0, turn off the valves
- }
- //
- /*
-   STILL NEED TO WRITE THE CODE TO CHECK IF THE RTC EQUALS THE START TIME ON A WATER DAY
- */
- //
- // valve control
+  }
+  //
+  // valve control
   digitalWrite(valve1relay, valveArray[0]);
   digitalWrite(valve2relay, valveArray[1]);
   digitalWrite(valve3relay, valveArray[2]);
