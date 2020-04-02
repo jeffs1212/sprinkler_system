@@ -22,7 +22,9 @@ Description:
 
   The LCD displays the time and date, the selected zones and when a zone is running the time remaining
   
+
   12/20/18 starting the sprinkler run_time based on RTC = water day and start_time still needs to be written
+
 
 == Step 1: Installation
 Please describe the steps to install this project.
